@@ -5,16 +5,13 @@
 #ifndef DINOCTOPUS_2040_PIOMIDI_HPP
 #define DINOCTOPUS_2040_PIOMIDI_HPP
 #include <Arduino.h>
-#include <midi_Namespace.h>
 #include "hardware/pio.h"
 #include "uart_rx.pio.h"
 #include "uart_tx.pio.h"
 #include "midi_Defs.h"
 
-
 #define SERIAL_BAUD 31250
 
-BEGIN_MIDI_NAMESPACE
 class PioMIDI
 {
 public:
@@ -24,7 +21,7 @@ public:
     };
 
 public:
-    static const bool thruActivated = true;
+    static const bool thruActivated = false;
 
     void begin()
     {
@@ -36,7 +33,7 @@ public:
     {
     }
 
-    bool beginTransmission(MidiType)
+    static bool beginTransmission(midi::MidiType)
     {
         return true;
     };
@@ -70,7 +67,5 @@ private:
     uint offset_rx=0;
     uint offset_tx=0;
 };
-END_MIDI_NAMESPACE
-
 
 #endif //DINOCTOPUS_2040_PIOMIDI_HPP
