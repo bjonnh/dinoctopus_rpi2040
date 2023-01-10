@@ -1,9 +1,9 @@
 #include <Arduino.h>
 #include <Adafruit_TinyUSB.h>
-#include "hardware/pio.h"
-#include "hardware/uart.h"
-#include "uart_rx.pio.h"
-#include "uart_tx.pio.h"
+//#include "hardware/pio.h"
+//#include "hardware/uart.h"
+//#include "uart_rx.pio.h"
+//#include "uart_tx.pio.h"
 #include "MIDI.h"
 #include "piomidi.hpp"
 #include "usbcablemidi.hpp"
@@ -18,12 +18,7 @@
 #define PIN_MIDI_3_TX 11
 
 #define PIN_MIDI_4_RX 8
-#define PIN_MIDI_5_TX 9
-
-PIO pio_rx = pio0;
-PIO pio_tx = pio1;
-uint offset_rx = pio_add_program(pio_rx, &uart_rx_program);
-uint offset_tx = pio_add_program(pio_tx, &uart_tx_program);
+#define PIN_MIDI_4_TX 9
 
 // USB MIDI object
 Adafruit_USBD_MIDI usb_midi(4); // number of virtual cables, you will need to define all the interfaces here
@@ -39,17 +34,26 @@ MIDI_NAMESPACE::MidiInterface<UsbJackMIDI> MIDI_USB_3(jack_2);
 UsbJackMIDI jack_3(usb_midi);
 MIDI_NAMESPACE::MidiInterface<UsbJackMIDI> MIDI_USB_4(jack_3);
 
-PioMIDI pio_serial(pio_rx, pio_tx, offset_rx, offset_tx, 0, 0, PIN_MIDI_1_RX, PIN_MIDI_1_TX);
-MIDI_NAMESPACE::MidiInterface<PioMIDI> MIDI_IF_1(pio_serial);
+//PioMIDI pio_serial(pio_rx, pio_tx, offset_rx, offset_tx, 0, 0, PIN_MIDI_1_RX, PIN_MIDI_1_TX);
+// TODO move the init of SerialPIO into PioMIDI!
+SerialPIO pio_serial(PIN_MIDI_1_TX, PIN_MIDI_1_RX , 32);
+PioMIDI pio_midi(pio_serial);
+MIDI_NAMESPACE::MidiInterface<PioMIDI> MIDI_IF_1(pio_midi);
 
-PioMIDI pio_serial2(pio_rx, pio_tx, offset_rx, offset_tx, 1, 1, PIN_MIDI_2_RX, PIN_MIDI_2_TX);
-MIDI_NAMESPACE::MidiInterface<PioMIDI> MIDI_IF_2(pio_serial2);
+//PioMIDI pio_serial2(pio_rx, pio_tx, offset_rx, offset_tx, 1, 1, PIN_MIDI_2_RX, PIN_MIDI_2_TX);
+SerialPIO pio_serial2(PIN_MIDI_2_TX, PIN_MIDI_2_RX , 32);
+PioMIDI pio_midi2(pio_serial2);
+MIDI_NAMESPACE::MidiInterface<PioMIDI> MIDI_IF_2(pio_midi2);
 
-PioMIDI pio_serial3(pio_rx, pio_tx, offset_rx, offset_tx, 2, 2, PIN_MIDI_3_RX, PIN_MIDI_3_TX);
-MIDI_NAMESPACE::MidiInterface<PioMIDI> MIDI_IF_3(pio_serial3);
+//PioMIDI pio_serial3(pio_rx, pio_tx, offset_rx, offset_tx, 2, 2, PIN_MIDI_3_RX, PIN_MIDI_3_TX);
+SerialPIO pio_serial3(PIN_MIDI_3_TX, PIN_MIDI_3_RX , 32);
+PioMIDI pio_midi3(pio_serial3);
+MIDI_NAMESPACE::MidiInterface<PioMIDI> MIDI_IF_3(pio_midi3);
 
-PioMIDI pio_serial4(pio_rx, pio_tx, offset_rx, offset_tx, 3, 3, PIN_MIDI_4_RX, PIN_MIDI_5_TX);
-MIDI_NAMESPACE::MidiInterface<PioMIDI> MIDI_IF_4(pio_serial4);
+//PioMIDI pio_serial4(pio_rx, pio_tx, offset_rx, offset_tx, 3, 3, PIN_MIDI_4_RX, PIN_MIDI_5_TX);
+SerialPIO pio_serial4(PIN_MIDI_4_TX, PIN_MIDI_4_RX , 32);
+PioMIDI pio_midi4(pio_serial4);
+MIDI_NAMESPACE::MidiInterface<PioMIDI> MIDI_IF_4(pio_midi4);
 
 /**
  * Ok so this is a bit tricky. When using USB any read, will read on every cable. So what we do is store the
