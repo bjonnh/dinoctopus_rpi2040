@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <Adafruit_TinyUSB.h>
+#include <U8g2lib.h>
+#include <Adafruit_NeoPixel.h>
 //#include "hardware/pio.h"
 //#include "hardware/uart.h"
 //#include "uart_rx.pio.h"
@@ -8,17 +10,26 @@
 #include "piomidi.hpp"
 #include "usbcablemidi.hpp"
 
-#define PIN_MIDI_1_RX 14
-#define PIN_MIDI_1_TX 16
+#define NEOPIXEL_PIN 9
 
-#define PIN_MIDI_2_RX 12
-#define PIN_MIDI_2_TX 13
+#define LCD_CLOCK 7  // Clock (Common), sometimes called SCK or SCL
+#define LCD_MOSI 6   // MOSI (common), sometimes called SDA or DATA
+#define LCD_RESET 8   // LCD reset, sometimes called RST or RSTB
+#define LCD_CS 2      // LCD CS, sometimes called EN or SS
+#define LCD_RS 3      // LCD RS, sometimes called A0 or DC
 
-#define PIN_MIDI_3_RX 10
-#define PIN_MIDI_3_TX 11
 
-#define PIN_MIDI_4_RX 8
-#define PIN_MIDI_4_TX 9
+#define PIN_MIDI_1_RX 12
+#define PIN_MIDI_1_TX 13
+
+#define PIN_MIDI_2_RX 14
+#define PIN_MIDI_2_TX 15
+
+#define PIN_MIDI_3_RX 16
+#define PIN_MIDI_3_TX 17
+
+#define PIN_MIDI_4_RX 18
+#define PIN_MIDI_4_TX 19
 
 // USB MIDI object
 Adafruit_USBD_MIDI usb_midi(4); // number of virtual cables, you will need to define all the interfaces here
@@ -95,8 +106,50 @@ void usb_controlChange(byte channel, byte number, byte value) {
     get_interface()->sendControlChange(number, value, channel);
 }
 
+
+int r0=0,r1=0,r2=0;
+int g0=0,g1=0,g2=0;
+int b0=0,b1=0,b2=0;
+
+
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(3, NEOPIXEL_PIN, NEO_GRB+ NEO_KHZ800);
+U8G2_ST7567_JLX12864_1_4W_SW_SPI u8g2_lcd(U8G2_R2,
+                                          LCD_CLOCK,
+                                          LCD_MOSI,
+                                          LCD_CS,
+                                          LCD_RS,
+                                          LCD_RESET); // clock, data, cs, dc, reset
+
+
+void setColors() {
+    r0+=5;
+    if (r0>55) { r1+=5; r0=25; }
+    if (r1>55) { g0+=5 ; r1=25; }
+    if (g0>55) { g1+=5; g0=25; }
+    if (g1>55) { b0+=5; g1=25; }
+    if (b0>55) { b1+=5; b0=25; }
+    if (b1>55) { b1=25; }
+    strip.clear();
+    strip.setPixelColor(0, strip.Color(g0, r0, b0));
+    strip.setPixelColor(1, strip.Color(g1, r1, b1));
+    strip.setPixelColor(2, strip.Color(155, 255, 150));
+    strip.show();
+}
+
+void initStrip() {
+    strip.begin();
+    strip.setBrightness(255);
+    strip.setPixelColor(0, strip.Color(15, 25, 0*25));
+    strip.setPixelColor(1, strip.Color(15, 25, 0*25));
+    strip.setPixelColor(2, strip.Color(155, 255, 0*255));
+    strip.show();
+}
+
+
+
 void setup() {
     TinyUSB_Device_Init(0);
+    initStrip();
 
     MIDI_USB_1.begin(MIDI_CHANNEL_OMNI);
     MIDI_USB_2.begin(MIDI_CHANNEL_OMNI);
@@ -106,6 +159,23 @@ void setup() {
     // wait until device mounted
     while (!TinyUSBDevice.mounted())
         delay(1);
+    u8g2_lcd.begin();
+    u8g2_lcd.setContrast(180);  // This is extremely important
+    u8g2_lcd.clearBuffer();
+    u8g2_lcd.firstPage();
+    u8g2_lcd.setFont(u8g2_font_6x12_tr);
+    u8g2_lcd.setFontMode(0);
+    u8g2_lcd.firstPage();
+    do {
+        //u8g2_lcd.drawHLine(0, 58, 128);
+        u8g2_lcd.drawStr(0, 10, "A strange game.");
+        u8g2_lcd.drawStr(0,20, "The only winning move");
+        u8g2_lcd.drawStr(0,30," is not to play");
+        //char c=42;
+        //snprintf_P(buffer, sizeof(buffer), PSTR("%02x %04x"), c, cycle);
+        //u8g2_lcd.drawStr(10, 10, buffer);
+        u8g2_lcd.drawStr(0, 0, "Started");
+    } while (u8g2_lcd.nextPage());
 
     MIDI_USB_1.setHandleNoteOn(usb_handleNoteOn);
     MIDI_USB_1.setHandleNoteOff(usb_handleNoteOff);
