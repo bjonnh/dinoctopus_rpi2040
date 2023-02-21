@@ -19,8 +19,8 @@ typedef struct
 class UsbJackMIDI
 {
 public:
-    explicit UsbJackMIDI(Adafruit_USBD_MIDI usb_midi)
-            : usb_midi(std::move(usb_midi))
+    explicit UsbJackMIDI(Adafruit_USBD_MIDI usb_midi, int cable)
+            : usb_midi(std::move(usb_midi)), cable(cable)
     {
     };
 
@@ -41,9 +41,10 @@ public:
         return true;
     };
 
-    void write(byte value)
+    void write(uint8_t value)
     {
-        usb_midi.write(value);
+        tud_midi_stream_write(cable, &value, 1);
+        //usb_midi.write(value);
     };
 
     void endTransmission()
