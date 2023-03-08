@@ -161,19 +161,27 @@ void initStrip() {
     strip.setPixelColor(2, strip.Color(15, 255, 45));
     strip.show();
 }
-
+bool usb_ready = false;
 void setup() {
     TinyUSB_Device_Init(0);
     initStrip();
+
+    // wait until device mounted
 
     MIDI_USB_1.begin(MIDI_CHANNEL_OMNI);
     MIDI_USB_2.begin(MIDI_CHANNEL_OMNI);
     MIDI_USB_3.begin(MIDI_CHANNEL_OMNI);
     MIDI_USB_4.begin(MIDI_CHANNEL_OMNI);
 
-    // wait until device mounted
     while (!TinyUSBDevice.mounted())
         delay(1);
+
+    MIDI_IF_1.begin(MIDI_CHANNEL_OMNI);
+    MIDI_IF_2.begin(MIDI_CHANNEL_OMNI);
+    MIDI_IF_3.begin(MIDI_CHANNEL_OMNI);
+    MIDI_IF_4.begin(MIDI_CHANNEL_OMNI);
+
+
     u8g2_lcd.begin();
     u8g2_lcd.setContrast(180);  // This is extremely important
     u8g2_lcd.clearBuffer();
@@ -191,10 +199,6 @@ void setup() {
         //u8g2_lcd.drawStr(10, 10, buffer);
     } while (u8g2_lcd.nextPage());
 
-    MIDI_IF_1.begin();
-    MIDI_IF_2.begin();
-    MIDI_IF_3.begin();
-    MIDI_IF_4.begin();
 }
 
 template <typename T, typename U>
