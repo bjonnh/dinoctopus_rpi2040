@@ -4,76 +4,42 @@
 
 #ifndef DINOCTOPUS_2040_PIOMIDI_HPP
 #define DINOCTOPUS_2040_PIOMIDI_HPP
+
 #include <Arduino.h>
-#include <midi_Namespace.h>
-#include "hardware/pio.h"
-#include "uart_rx.pio.h"
-#include "uart_tx.pio.h"
+#include <SoftwareSerial.h>
 #include "midi_Defs.h"
 
+#define PIO_SERIAL_MIDI(number, tx_pin, rx_pin) SerialPIO pio_serial##number(tx_pin, rx_pin, 32); \
+    MIDI_NAMESPACE::PioMIDI pio_midi##number(pio_serial##number); \
+    MIDI_NAMESPACE::MidiInterface<MIDI_NAMESPACE::PioMIDI> MIDI_IF_##number(pio_midi##number);
 
 #define SERIAL_BAUD 31250
-
+#pragma once
 BEGIN_MIDI_NAMESPACE
-class PioMIDI
-{
-public:
-    PioMIDI(PIO pio_rx, PIO pio_tx, uint offset_rx, uint offset_tx, uint sm_rx, uint sm_tx, uint rxpin, uint txpin)
-            : pio_rx(pio_rx), pio_tx(pio_tx),
-                offset_rx(offset_rx), offset_tx(offset_tx),
-                sm_rx(sm_rx), sm_tx(sm_tx),
-                rxpin(rxpin), txpin(txpin)
-    {
+    class PioMIDI {
+    public:
+        explicit PioMIDI(const SerialPIO &serialPio)
+                : serialPio(serialPio) {
+        };
+
+        static const bool thruActivated = false;
+
+        void begin();
+
+        void end();
+
+        static bool beginTransmission(midi::MidiType);
+
+        void write(byte value);
+
+        void endTransmission();
+
+        byte read();
+
+        unsigned available();
+
+    private:
+        SerialPIO serialPio;
     };
-
-public:
-    static const bool thruActivated = false;
-
-    void begin()
-    {
-        uart_rx_program_init(pio_rx, sm_rx, offset_rx, rxpin, SERIAL_BAUD);
-        uart_tx_program_init(pio_tx, sm_tx, offset_tx, txpin, SERIAL_BAUD);
-    }
-
-    void end()
-    {
-    }
-
-    bool beginTransmission(MidiType)
-    {
-        return true;
-    };
-
-    void write(byte value)
-    {
-        uart_tx_program_putc(pio_tx, sm_tx, value);
-    };
-
-    void endTransmission()
-    {
-    };
-
-    byte read()
-    {
-        return uart_rx_program_getc(pio_rx, sm_rx);
-    };
-
-    unsigned available()
-    {
-        return !pio_sm_is_rx_fifo_empty(pio_rx, sm_rx);
-    };
-
-private:
-    PIO pio_rx;
-    PIO pio_tx;
-    uint sm_rx;
-    uint sm_tx;
-    uint rxpin;
-    uint txpin;
-    uint offset_rx=0;
-    uint offset_tx=0;
-};
 END_MIDI_NAMESPACE
-
-
 #endif //DINOCTOPUS_2040_PIOMIDI_HPP
