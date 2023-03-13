@@ -68,52 +68,52 @@ void MidiRouter::init() {
 void MidiRouter::loop() {
     if (MIDI_IF_1.read())
     {
-        if (routing_matrix[0][0] > 0)
+        if (matrix[0][0] > 0)
             copy_midi_data(MIDI_IF_1, MIDI_IF_1);
-        if (routing_matrix[0][1] > 0)
+        if (matrix[0][1] > 0)
             copy_midi_data(MIDI_IF_1, MIDI_IF_2);
-        if (routing_matrix[0][2] > 0)
+        if (matrix[0][2] > 0)
             copy_midi_data(MIDI_IF_1, MIDI_IF_3);
-        if (routing_matrix[0][3] > 0)
+        if (matrix[0][3] > 0)
             copy_midi_data(MIDI_IF_1, MIDI_IF_4);
         copy_midi_data(MIDI_IF_1, MIDI_USB_1);
     }
 
     if (MIDI_IF_2.read())
     {
-        if (routing_matrix[1][0] > 0)
+        if (matrix[1][0] > 0)
             copy_midi_data(MIDI_IF_2, MIDI_IF_1);
-        if (routing_matrix[1][1] > 0)
+        if (matrix[1][1] > 0)
             copy_midi_data(MIDI_IF_2, MIDI_IF_2);
-        if (routing_matrix[1][2] > 0)
+        if (matrix[1][2] > 0)
             copy_midi_data(MIDI_IF_2, MIDI_IF_3);
-        if (routing_matrix[1][3] > 0)
+        if (matrix[1][3] > 0)
             copy_midi_data(MIDI_IF_2, MIDI_IF_4);
         copy_midi_data(MIDI_IF_2, MIDI_USB_2);
     }
 
     if (MIDI_IF_3.read())
     {
-        if (routing_matrix[2][0] > 0)
+        if (matrix[2][0] > 0)
             copy_midi_data(MIDI_IF_3, MIDI_IF_1);
-        if (routing_matrix[2][1] > 0)
+        if (matrix[2][1] > 0)
             copy_midi_data(MIDI_IF_3, MIDI_IF_2);
-        if (routing_matrix[2][2] > 0)
+        if (matrix[2][2] > 0)
             copy_midi_data(MIDI_IF_3, MIDI_IF_3);
-        if (routing_matrix[2][3] > 0)
+        if (matrix[2][3] > 0)
             copy_midi_data(MIDI_IF_3, MIDI_IF_4);
         copy_midi_data(MIDI_IF_3, MIDI_USB_3);
     }
 
     if (MIDI_IF_4.read())
     {
-        if (routing_matrix[3][0] > 0)
+        if (matrix[3][0] > 0)
             copy_midi_data(MIDI_IF_4, MIDI_IF_1);
-        if (routing_matrix[3][1] > 0)
+        if (matrix[3][1] > 0)
             copy_midi_data(MIDI_IF_4, MIDI_IF_2);
-        if (routing_matrix[3][2] > 0)
+        if (matrix[3][2] > 0)
             copy_midi_data(MIDI_IF_4, MIDI_IF_3);
-        if (routing_matrix[3][3] > 0)
+        if (matrix[3][3] > 0)
             copy_midi_data(MIDI_IF_4, MIDI_IF_4);
         copy_midi_data(MIDI_IF_4, MIDI_USB_4);
     }
@@ -140,4 +140,8 @@ void MidiRouter::loop() {
                 MIDI_IF_1.send(type,data1,data2,channel);
         }
     }
+}
+
+void MidiRouter::get_matrix(routing_matrix& matrix_out) {
+    memcpy(matrix_out, matrix, 4*4*sizeof(uint32_t));
 }

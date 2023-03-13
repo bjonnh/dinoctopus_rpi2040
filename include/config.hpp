@@ -27,6 +27,8 @@
 // MIDI
 //
 
+#define NUMBER_OF_PHYSICAL_MIDI_PORTS 4
+
 #define PIN_MIDI_1_RX 12
 #define PIN_MIDI_1_TX 13
 
@@ -42,5 +44,9 @@
 #define ENC_A 20
 #define ENC_B 21
 #define ENC_C 22
+
+#define N_LOOPS_MAX_LATENCY_CORE0 10000
+#define N_LOOPS_MAX_LATENCY_CORE1 100
+
 
 #endif //DINOCTOPUS_2040_CONFIG_HPP

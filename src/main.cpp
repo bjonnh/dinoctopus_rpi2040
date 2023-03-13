@@ -1,83 +1,78 @@
 #include <Arduino.h>  // necessary for setup/loop
 #include "midi_router.hpp"
 #include "ui.hpp"
+#include "queue.hpp"
+#include "utils.hpp"
+#include "config.hpp"
 
 MidiRouter midi_router;
 UI ui;
 
-uint8_t processor_0_time = 0;
-uint8_t processor_0_latency = 0;
 
-uint8_t processor_1_time = 0;
-uint8_t processor_1_latency = 0;
+
+// Core 0, running the MIDI will only receive requests never send any
+queue_t request_queue;
+queue_t response_queue;
+
+LATENCY_VARIABLES(0)
+LATENCY_VARIABLES(1)
 
 
 void setup() {
-    processor_0_time = to_us_since_boot(get_absolute_time());
+    LATENCY_INIT(0)
+    queue_init(&request_queue, sizeof(queue_request_t), 2);
+    queue_init(&response_queue, sizeof(queue_response_t), 2);
     midi_router.init();
 }
 
 void setup1() {
-    processor_1_time = to_us_since_boot(get_absolute_time());
+    LATENCY_INIT(1)
     ui.init();
 }
 
-int count_latency_0 = 0;
 
 void loop() {
-    processor_0_latency = to_us_since_boot(get_absolute_time()) - processor_0_time;
-    uint32_t current_latency = to_us_since_boot(get_absolute_time());
-    if (current_latency > processor_0_time)
-        processor_0_time = current_latency;
-    count_latency_0++;
-    if (count_latency_0 > 1000) {
-        count_latency_0=0;
-        bool fifo_success = rp2040.fifo.push_nb(0x0); // 0x0 is latency of other CPU
-        if (fifo_success)
-            rp2040.fifo.push_nb(processor_0_latency);
-    }
-    if (rp2040.fifo.available() >= 2) {
-        uint32_t code = rp2040.fifo.pop();
-        uint32_t value = rp2040.fifo.pop();
-        if (code == 0x1000) {
-            bool fifo_success = rp2040.fifo.push_nb(code);
-            if (fifo_success)
-                rp2040.fifo.push_nb(value);
+    LATENCY_CALCULATOR(0);
+
+    if (queue_get_level(&request_queue) > 0) {
+        queue_request_t request;
+        queue_remove_blocking(&request_queue, &request);
+        if (request.code == REQUEST_LATENCY) {
+            queue_response_t entry = {RESPONSE_LATENCY, processor_max_latency_0};
+            queue_add_blocking(&response_queue, &entry);
+        } else if (request.code == REQUEST_ROUTING) {
+            queue_response_t entry = {RESPONSE_ROUTING};
+            midi_router.get_matrix(entry.data);
+            queue_add_blocking(&response_queue, &entry);
         }
-        if ((rp2040.fifo.available()%2)==1)
-            rp2040.fifo.pop(); // We try to catch back
     }
 
     midi_router.loop();
 }
 
-int count_latency_1 = 0;
 void loop1() {
-    processor_1_latency = to_us_since_boot(get_absolute_time()) - processor_1_time;
-    uint32_t current_latency = to_us_since_boot(get_absolute_time());
-    if (current_latency > processor_0_time)
-        processor_1_time = current_latency;
-    count_latency_1++;
-    if (count_latency_1 > 100) {
-        count_latency_1=0;
-        ui.set_latency(1, processor_1_time);
-    }
-    if (rp2040.fifo.available() >= 2) {
-        uint32_t code = rp2040.fifo.pop();
-        uint32_t value = rp2040.fifo.pop();
-        if (code == 0x0)
-            ui.set_latency(0, value);
-        else if (code == 0x1000) {
-            ui.set_query_response(code, value);
+    LATENCY_CALCULATOR(1);
+    if (count_latency_1==N_LOOPS_MAX_LATENCY_CORE1)
+        ui.set_latency(1, processor_max_latency_1);
+
+    if (queue_get_level(&response_queue) > 0) {
+        queue_response_t response;
+        queue_remove_blocking(&response_queue, &response);
+        if (response.code == RESPONSE_LATENCY) {
+            ui.set_latency(0, response.data[0][0]);
+        } else if (response.code == RESPONSE_ROUTING) {
+            ui.set_routing_response(response.data);
         }
-        if ((rp2040.fifo.available()%2)==1)
-           rp2040.fifo.pop(); // We try to catch back
     }
+
     uint32_t query = ui.query_for_router();
-    if (query!=0) {
-        bool fifo_success = rp2040.fifo.push_nb(0x1000); // 0x100x is tell me about routing of port x
-        if (fifo_success)
-            rp2040.fifo.push_nb(query);
+    // Unless we are asking for something specific, let's just ask for latency
+    if (query != 0) {
+        queue_request_t entry = {REQUEST_ROUTING, query};
+        queue_add_blocking(&request_queue, &entry);
+    } else {
+        queue_request_t entry = {REQUEST_LATENCY, 0};
+        queue_add_blocking(&request_queue, &entry);
     }
     ui.loop();
 }

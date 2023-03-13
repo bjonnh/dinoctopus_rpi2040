@@ -4,45 +4,16 @@
 
 #include <Arduino.h>
 #include "ui.hpp"
-#include "Adafruit_NeoPixel.h"
 #include "U8g2lib.h"
 #include "config.hpp"
 #include <SPI.h>
 
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(3, NEOPIXEL_PIN, NEO_RGB + NEO_KHZ800);
-/*U8G2_ST7567_JLX12864_1_4W_SW_SPI u8g2_lcd(U8G2_R2,
-                                          LCD_CLOCK,
-                                          LCD_MOSI,
-                                          LCD_CS,
-                                          LCD_RS,
-                                          LCD_RESET); // clock, data, cs, dc, reset
-*/
-/*U8G2_ST7567_JLX12864_1_3W_SW_SPI u8g2_lcd(U8G2_R2,
-                                          LCD_CLOCK,
-                                          LCD_MOSI,
-                                          LCD_CS,
-
-                                          LCD_RESET);*/
 
 U8G2_ST7567_JLX12864_F_4W_HW_SPI u8g2_lcd(U8G2_R2,
                                           LCD_CS,//LCD_CS,
                                           LCD_RS,
                                           LCD_RESET);
 
-void UI::initStrip() {
-    strip.begin();
-    strip.setBrightness(255);
-    strip.setPixelColor(0, Adafruit_NeoPixel::Color(255, 25, 0));
-    strip.setPixelColor(1, Adafruit_NeoPixel::Color(255, 25, 0));
-    strip.setPixelColor(2, Adafruit_NeoPixel::Color(255, 25, 0));
-    strip.show();
-    delay(1000);
-    strip.setBrightness(255);
-    strip.setPixelColor(0, Adafruit_NeoPixel::Color(1, 255, 85));
-    strip.setPixelColor(1, Adafruit_NeoPixel::Color(1, 255, 145));
-    strip.setPixelColor(2, Adafruit_NeoPixel::Color(15, 255, 45));
-    strip.show();
-}
 
 void UI::initLCD() {
     SPI.setRX(0);
@@ -56,7 +27,6 @@ void UI::initLCD() {
     u8g2_lcd.setContrast(180);  // This is extremely important
     u8g2_lcd.clearBuffer();
     u8g2_lcd.firstPage();
-    u8g2_lcd.setFont(u8g2_font_6x12_tr);
     u8g2_lcd.setFontMode(0);
     u8g2_lcd.clearBuffer();
     u8g2_lcd.drawStr(0, 10, "A strange game.");
@@ -68,88 +38,8 @@ void UI::initLCD() {
 int oldclickcount = 0;
 int clickcount = 0;
 
-bool CLKstate;
-bool DTstate;
-
 int16_t inputDelta = 0;             // Counts up or down depending which way the encoder is turned
-static uint8_t state = 0;
 
-// https://forum.arduino.cc/t/reading-rotary-encoders-as-a-state-machine/937388
-void readEncoder() {
-    switch (state) {
-        // Start state
-        case 0:
-            if (!CLKstate) {             // Turn clockwise and CLK goes low first
-                state = 1;
-            } else if (!DTstate) {      // Turn anticlockwise and DT goes low first
-                state = 4;
-            }
-            break;
-        // Clockwise rotation
-        case 1:
-            if (!DTstate) {             // Continue clockwise and DT will go low after CLK
-                state = 2;
-            }
-            break;
-        case 2:
-            if (CLKstate) {             // Turn further and CLK will go high first
-                state = 3;
-            }
-            break;
-        case 3:
-            if (CLKstate && DTstate) {  // Both CLK and DT now high as the encoder completes one step clockwise
-                state = 0;
-                ++inputDelta;
-            }
-            break;
-            // Anticlockwise rotation
-        case 4:                         // As for clockwise but with CLK and DT reversed
-            if (!CLKstate) {
-                state = 5;
-            }
-            break;
-        case 5:
-            if (DTstate) {
-                state = 6;
-            }
-            break;
-        case 6:
-            if (CLKstate && DTstate) {
-                state = 0;
-                --inputDelta;
-            }
-            break;
-    }
-}
-
-unsigned long time_a = to_ms_since_boot(get_absolute_time());
-int delayTime_a = 200;
-
-void encoderMove(uint gpio, uint32_t events) {
-    if ((to_ms_since_boot(get_absolute_time()) - time_a) > delayTime_a) {
-        time_a = to_ms_since_boot(get_absolute_time());
-        if ((gpio == ENC_A) && (events & GPIO_IRQ_EDGE_FALL))
-            clickcount += 1;
-    }
-
-    if ((gpio == ENC_B) || (gpio == ENC_C)) {
-        CLKstate = gpio_get(ENC_B);
-        DTstate = gpio_get(ENC_C);
-        readEncoder();
-    }
-}
-
-void UI::initEncoder() {
-    pinMode(ENC_A, INPUT_PULLUP);
-    pinMode(ENC_B, INPUT_PULLUP);
-    pinMode(ENC_C, INPUT_PULLUP);
-    gpio_set_irq_enabled_with_callback(ENC_A, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &encoderMove);
-    CLKstate = digitalRead(ENC_B);
-    DTstate = digitalRead(ENC_C);
-    gpio_set_irq_enabled_with_callback(ENC_B, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &encoderMove);
-    gpio_set_irq_enabled_with_callback(ENC_C, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &encoderMove);
-    interrupts();
-}
 
 void UI::init() {
     initStrip();
@@ -157,30 +47,108 @@ void UI::init() {
     initEncoder();
 }
 
-char buff[50];
+char matrix_sign(uint32_t v) {
+    return v > 0 ? 'X' : '.';
+}
 
-void UI::writetext(char *s) {
+#define LINE_HEIGHT 8
+
+uint8_t page = 0;
+uint8_t cursor_position = 0;
+uint8_t zone = 0; // 0 menu bar anything above is in the page itself and should be handled by it
+
+// TODO make those pages as classes so they can receive events
+// TODO make it able to go back to the previous zone if going to cursor 0
+uint8_t p0_selected_input = 1;
+uint8_t p0_selected_output = 0;
+
+void UI::page0() {
+    // zone 1: select input
+    // zone 2: select output
+    if (zone == 1) {
+        p0_selected_input = cursor_position;
+    } else if (zone == 2) {
+        p0_selected_output = cursor_position;
+    }
+    u8g2_lcd.setFont(u8g2_font_5x8_mf);
+    u8g2_lcd.drawStr(0, 2.5 * LINE_HEIGHT, "IO|   1   2   3   4 ");
+    u8g2_lcd.drawHLine(0, 2.5 * LINE_HEIGHT, 100);
+    for (uint8_t i = 0; i < 4; i++) {
+        if (zone>0 && p0_selected_input == i+1)
+            u8g2_lcd.setDrawColor(0);
+        else
+            u8g2_lcd.setDrawColor(1);
+        snprintf(buffer, 3, "%d", i);
+        u8g2_lcd.drawStr(0, (3.5 + i) * LINE_HEIGHT, buffer);
+        u8g2_lcd.setDrawColor(1);
+        u8g2_lcd.drawStr(10, (3.5 + i) * LINE_HEIGHT, "|");
+        for (int j = 0; j<4 ; j++) {
+            if ((p0_selected_output == j+1) && (p0_selected_input == i+1))
+                u8g2_lcd.setDrawColor(0);
+            else
+                u8g2_lcd.setDrawColor(1);
+            snprintf(buffer, 50, "   %c", matrix_sign(current_matrix[i][j]));
+            u8g2_lcd.drawStr(15+20*j, (3.5 + i) * LINE_HEIGHT, buffer);
+        }
+
+    }
+}
+
+void UI::common() {
+    u8g2_lcd.setFont(u8g2_font_5x8_mf);
+    u8g2_lcd.setDrawColor(1);
+
+    if (page == 0)
+        if ((zone == 0) || cursor_position == 0)
+            u8g2_lcd.setDrawColor(0);
+        else {
+            u8g2_lcd.drawHLine(0, LINE_HEIGHT + 1, 50);
+        }
+    u8g2_lcd.drawStr(0, LINE_HEIGHT, "ROUTING");
+    u8g2_lcd.setDrawColor(1);
+
+    if (page == 1)
+        if (zone == 0 || cursor_position == 0)
+            u8g2_lcd.setDrawColor(0);
+        else {
+            u8g2_lcd.drawHLine(50, LINE_HEIGHT + 1, 50);
+        }
+    u8g2_lcd.drawStr(50, LINE_HEIGHT, "SETTINGS");
+    u8g2_lcd.setDrawColor(1);
+
+    if (page == 2)
+        if (zone == 0 || cursor_position == 0)
+            u8g2_lcd.setDrawColor(0);
+        else {
+            u8g2_lcd.drawHLine(100, LINE_HEIGHT + 1, 50);
+        }
+    u8g2_lcd.drawStr(100, LINE_HEIGHT, "DEBUG");
+    u8g2_lcd.setDrawColor(1);
+
+    u8g2_lcd.setDrawColor(1);
+    snprintf(buffer, 50, "L [0:%4d] [1:%4d]", latency_cpu[0], latency_cpu[1]);
+    u8g2_lcd.drawStr(0, 8 * LINE_HEIGHT - 1, buffer);
+}
+
+void UI::display_update() {
     u8g2_lcd.clearBuffer();
-    snprintf(buff, 50, "B: %d C: %d c: %d r: %d", CLKstate, DTstate, clickcount, inputDelta);
-    u8g2_lcd.drawStr(0, 10, buff);
+    if (page == 0) {
+        page0();
+    }
 
-    u8g2_lcd.drawStr(0, 20, s);
-    snprintf(buff, 50, "Q %4lx %4lx", query_code, query_value);
-    u8g2_lcd.drawStr(0, 30, buff);
-    snprintf(buff, 50, "L [0: %4d] [1: %4d]", latency_cpu[0], latency_cpu[1]);
-    u8g2_lcd.drawStr(0, 60, buff);
+    common();
     u8g2_lcd.sendBuffer();
 }
 
 int count = 0;
+
 void UI::loop() {
+    encoderPoll();
     if (oldclickcount != clickcount) {
         query_router_for = clickcount;
         oldclickcount = clickcount;
     }
-
-    snprintf(buffer, 50, "%x %x %x %x %x %x", count++, count, count, count ,count ,count);
-    writetext(buffer);
+    display_update();
 }
 
 void UI::set_latency(uint8_t cpu, uint32_t value) {
@@ -193,7 +161,52 @@ uint32_t UI::query_for_router() {
     return request;
 }
 
-void UI::set_query_response(uint32_t code, uint32_t value) {
-    query_code = code;
-    query_value = value;
+void UI::set_routing_response(routing_matrix &new_matrix) {
+    memcpy(current_matrix, new_matrix, sizeof(uint32_t) * 4 * 4);
+}
+
+void UI::encoder_right() {
+    cursor_position += 1;
+    if (zone == 0) {
+        if (cursor_position > 2)
+            cursor_position = 2;
+        page = cursor_position;
+    } else if (zone == 1) { // TODO This should go in page management
+        if (page == 0)
+            if (cursor_position > 4)
+                cursor_position = 4;
+    } else if (zone == 2) { // TODO This should go in the page management
+        if (page == 0)
+            if (cursor_position > 4)
+                cursor_position = 4;
+    }
+}
+
+void UI::encoder_left() {
+    if (cursor_position > 0)
+        cursor_position -= 1;
+
+    if (zone == 0) {
+        page = cursor_position;
+    }
+}
+
+void UI::encoder_click() {
+    if (zone>0 && cursor_position==0) {
+        zone = 0;
+        cursor_position = page;
+        return;
+    }
+
+    if (zone == 0) {
+        zone = 1;
+        cursor_position = 1;
+    } else if (zone == 1) {
+      zone = 2;
+      cursor_position = 1;
+    } else if (zone == 2) { // TODO This should go in page  management
+        current_matrix[p0_selected_input-1][p0_selected_output-1] ^= 255;
+    }
+
+
 }

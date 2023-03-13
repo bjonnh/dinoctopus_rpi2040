@@ -6,19 +6,22 @@
 #define DINOCTOPUS_2040_UI_HPP
 
 
+#include "routingmatrix.hpp"
+
 class UI {
 public:
     void init();
     void loop();
 
-    void set_self_latency(uint8_t i);
-
     void set_latency(uint8_t cpu, uint32_t value);
 
     uint32_t query_for_router();
 
-    void set_query_response(uint32_t code, uint32_t value);
+    void set_routing_response(routing_matrix &matrix);
 
+    void encoder_click();
+    void encoder_right();
+    void encoder_left();
 private:
     char buffer[50];
 
@@ -27,12 +30,18 @@ private:
     void initLCD();
 
     void initEncoder();
-    void writetext(char *);
+    void display_update();
     uint8_t latency_cpu[2]={0,0};
 
-    int query_router_for = 0;
-    uint32_t query_code = 0;
-    uint32_t query_value= 0;
+    int query_router_for = 1; // We request an update when starting
+
+    routing_matrix current_matrix;
+
+    void page0();
+
+    void common();
+
+    void encoderPoll();
 };
 
 
